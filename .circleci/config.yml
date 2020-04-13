@@ -35,18 +35,22 @@ jobs:
             set -ex
             curl --retry 3 -L https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe -O
             ./rustup-init.exe -y
+            echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> $BASH_ENV
+            cat > ~/.cargo/config << EOF
+            [net]  
+            git-fetch-with-cli = true
+            EOF
       - run:
           name: "Build"
           command: |
             set -ex
-            export PATH="$PATH:$HOME/.cargo/bin"
             cargo --version
             cargo build
       - run:
           name: "Test"
           command: |
             set -ex
-            export PATH="$PATH:$HOME/.cargo/bin:$PWD/target/debug"
+            export PATH="$PATH:$PWD/target/debug"
             cargo test
 
 workflows:

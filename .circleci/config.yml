@@ -1,11 +1,43 @@
 # Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
+
+orbs:
+  win: circleci/windows@2.2.0 # The Windows orb give you everything you need to start using the Windows executor.
+
 jobs:
-  build:
+  linux_build:
     docker:
       - image: circleci/rust
     steps:
       - checkout
+      - run:
+          name: "Build"
+          command: |
+            set -ex
+            cargo --version
+            cargo build
+      - run:
+          name: "Test"
+          command: |
+            set -ex
+            export PATH="$PATH:$PWD/target/debug"
+            cargo test
+
+  win_build:
+    executor:
+      name: win/default
+      size: "medium"
+      shell: bash.exe
+
+    steps:
+      - checkout
+      - run:
+          name: "Install Rust"
+          command: |
+            set -ex
+            curl --retry 3 -L https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe -O
+            ./rustup-init.exe -y
+            export PATH="$PATH:$HOME/.cargo/bin"
       - run:
           name: "Build"
           command: |

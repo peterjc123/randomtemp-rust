@@ -37,6 +37,7 @@ jobs:
             ./rustup-init.exe -y
             echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> $BASH_ENV
             cat ~/.gitconfig
+            git config --global --remove-section url."ssh://git@github.com"
       - run:
           name: "Build"
           command: |

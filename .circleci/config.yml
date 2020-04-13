@@ -9,10 +9,12 @@ jobs:
       - run:
           name: "Build"
           command: |
+            set -ex
             cargo --version
             cargo build
       - run:
           name: "Test"
           command: |
-            cp target/debug/randomtemp target/debug/deps/
+            set -ex
+            export PATH="$PATH:$PWD/target/debug"
             cargo test

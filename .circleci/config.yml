@@ -29,8 +29,6 @@ jobs:
       shell: bash.exe
     steps:
       - checkout
-        post:
-          - git config --global --unset url.ssh://git@github.com:.insteadof
       - run:
           name: "Install Rust"
           command: |
@@ -38,6 +36,7 @@ jobs:
             curl --retry 3 -L https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe -O
             ./rustup-init.exe -y
             echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> $BASH_ENV
+            git config --global --unset url.ssh://git@github.com:.insteadof
             cat ~/.gitconfig
       - run:
           name: "Build"

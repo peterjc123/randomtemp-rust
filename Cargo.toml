@@ -1,0 +1,11 @@
+[package]
+name = "randomtemp"
+version = "0.1.0"
+authors = ["peter <peterghost86@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tempfile = "3.0.1"
+which = "3.1.1"

@@ -5,7 +5,7 @@ orbs:
   win: circleci/windows@2.2.0 # The Windows orb give you everything you need to start using the Windows executor.
 
 jobs:
-  linux_build:
+  linux_build_test:
     docker:
       - image: circleci/rust
     steps:
@@ -22,13 +22,11 @@ jobs:
             set -ex
             export PATH="$PATH:$PWD/target/debug"
             cargo test
-
-  win_build:
+  win_build_test:
     executor:
       name: win/default
       size: "medium"
       shell: bash.exe
-
     steps:
       - checkout
       - run:
@@ -50,3 +48,12 @@ jobs:
             set -ex
             export PATH="$PATH:$PWD/target/debug"
             cargo test
+
+workflows:
+  version: 2
+  linux_build_and_test:
+    jobs:
+      - linux_build_test
+  win_build_and_test:
+    jobs:
+      - win_build_test

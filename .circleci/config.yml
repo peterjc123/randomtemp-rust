@@ -35,7 +35,7 @@ jobs:
             set -ex
             curl --retry 3 -L https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe -O
             ./rustup-init.exe -y
-            export PATH="$PATH:$HOME/.cargo/bin"
+            echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> $BASH_ENV
       - run:
           name: "Build"
           command: |

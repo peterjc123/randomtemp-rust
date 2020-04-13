@@ -9,8 +9,10 @@ jobs:
       - run:
           name: "Build"
           command: |
-            cargo -v
+            cargo --version
             cargo build
       - run:
           name: "Test"
-          command: cargo test
+          command: |
+            cp target/debug/randomtemp target/debug/deps/
+            cargo test

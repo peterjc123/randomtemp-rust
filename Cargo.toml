@@ -3,6 +3,12 @@ name = "randomtemp"
 version = "0.1.0"
 authors = ["peter <peterghost86@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/peterjc123/randomtemp"
+description = "A utility to override the temp directory for an executable"
+license-file = "LICENSE"
+readme = "README.md"
+keywords = ["tempdir", "env", "dev"]
+categories = ["development-tools"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

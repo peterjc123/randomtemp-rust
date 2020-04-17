@@ -50,6 +50,7 @@ jobs:
             set -ex
             export PATH="$PATH:$PWD/target/debug"
             cargo test
+            cargo clippy --all -- -D warnings
 
 workflows:
   version: 2

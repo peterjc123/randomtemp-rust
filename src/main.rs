@@ -34,15 +34,15 @@ fn find_executable_in_path_by_name(p: &PathBuf, cp: &PathBuf) -> Option<PathBuf>
 
 fn find_executable_in_path() -> Result<PathBuf, String> {
 	let p = get_current_exe_pathbuf()?;
-	find_executable_in_path_by_name(&p, &p).ok_or(
+	find_executable_in_path_by_name(&p, &p).ok_or_else(|| {
 		"Cannot find which executable to pretend, either specify \
 		RANDOMTEMP_EXECUTABLE through the environmental variables \
 	 	or rename the executable to another one in PATH"
-			.to_string(),
-	)
+			.to_string()
+	})
 }
 
-fn find_executable_in_path_by_env(exec: &String) -> Result<PathBuf, String> {
+fn find_executable_in_path_by_env(exec: &str) -> Result<PathBuf, String> {
 	let p = PathBuf::from(&exec);
 	let cp = get_current_exe_pathbuf()?;
 	if is_same_file_stem(Some(&p), Some(&cp)) {
@@ -51,21 +51,21 @@ fn find_executable_in_path_by_env(exec: &String) -> Result<PathBuf, String> {
 	}
 	find_executable_in_path_by_name(&p, &cp)
 		.or_else(|| {
-			if let Some(_) = p.extension() {
+			if p.extension().is_some() {
 				None
 			} else {
 				Some(p)
 			}
 		})
-		.ok_or("RANDOMTEMP_EXECUTABLE points to an invalid executable".to_string())
+		.ok_or_else(|| "RANDOMTEMP_EXECUTABLE points to an invalid executable".to_string())
 }
 
 fn get_current_exe_pathbuf() -> Result<PathBuf, String> {
-	env::current_exe().or(Err("Cannot get the current working executable".to_string()))
+	env::current_exe().or_else(|_| Err("Cannot get the current working executable".to_string()))
 }
 
 fn get_current_dir_pathbuf() -> Result<PathBuf, String> {
-	env::current_dir().or(Err("Cannot get the current working directory".to_string()))
+	env::current_dir().or_else(|_| Err("Cannot get the current working directory".to_string()))
 }
 
 #[allow(dead_code)]
@@ -118,10 +118,10 @@ fn get_pretend_executable() -> String {
 		.and_then(|exec| {
 			find_executable_in_path_by_env(&exec)
 				.or_else(|e| {
-					if e.len() > 0 {
-						error_exit!(e);
-					} else {
+					if e.is_empty() {
 						Err(e)
+					} else {
+						error_exit!(e);
 					}
 				})
 				.ok()
@@ -132,7 +132,7 @@ fn get_pretend_executable() -> String {
 			})
 		})
 		.to_str()
-		.and_then(|s| Some(String::from(s)))
+		.map(String::from)
 		.unwrap_or_else(|| {
 			error_exit!("Cannot convert RANDOMTEMP_EXECUTABLE to a UTF-8 string");
 		})
@@ -148,17 +148,8 @@ fn get_base_dir() -> String {
 			}
 		})
 		.or_else(|_| get_current_dir())
-		.unwrap_or_else(|_| {
-			String::from(
-				env::current_dir()
-					.unwrap_or_else(|_| {
-						error_exit!("Cannot get the current working directory");
-					})
-					.to_str()
-					.unwrap_or_else(|| {
-						error_exit!("Cannot convert RANDOMTEMP_BASEDIR to a UTF-8 string");
-					}),
-			)
+		.unwrap_or_else(|e| {
+			error_exit!(e);
 		})
 }
 
@@ -174,7 +165,7 @@ fn get_max_trial() -> u8 {
 		.unwrap_or(DEFAULT_MAX_TRIAL)
 }
 
-fn try_run_with_new_temp(cwd: &String, executable: &String) -> process::ExitStatus {
+fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
 	let tmp_dir = TempDir::new_in(&cwd).unwrap_or_else(|_| {
 		error_exit!("Cannot create temporary directory");
 	});

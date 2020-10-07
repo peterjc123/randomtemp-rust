@@ -179,56 +179,62 @@ fn get_max_trial() -> u8 {
         .unwrap_or(DEFAULT_MAX_TRIAL)
 }
 
+#[cfg(windows)]
 fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
     let tmp_dir = TempDir::new_in(&cwd).unwrap_or_else(|_| {
         error_exit!("Cannot create temporary directory");
     });
     let tmp_path = &tmp_dir.path();
-    if cfg!(windows) {
-        if is_absolute_path(executable) {
-            process::Command::new(&executable)
-                .env("TEMP", tmp_path)
-                .env("TMP", tmp_path)
-                .args(env::args().skip(1))
-                .status()
-                .expect("failed to execute process")
-        } else {
-            // We need to quote the args here for Command Prompt
-            // Below is the workground given in
-            // https://internals.rust-lang.org/t/std-process-on-windows-is-escaping-raw-literals-which-causes-problems-with-chaining-commands/8163/16
-            let mut args = String::new();
-            args.push_str(quote_arg!(executable).as_str());
-            for arg in env::args().skip(1) {
-                args.push(' ');
-                args.push_str(quote_arg!(arg).as_str());
-            }
-            let arg_name = "RANDOMTEMP_COMMANDLINE";
-            process::Command::new("cmd")
-                .arg("/q")
-                .arg("/c")
-                .env("TEMP", tmp_path)
-                .env("TMP", tmp_path)
-                .env(arg_name, args.as_str())
-                .arg(format!("%{}%", arg_name))
-                .status()
-                .expect("failed to execute process")
-        }
+    if is_absolute_path(executable) {
+        process::Command::new(&executable)
+            .env("TEMP", tmp_path)
+            .env("TMP", tmp_path)
+            .args(env::args().skip(1))
+            .status()
+            .expect("failed to execute process")
     } else {
-        if is_absolute_path(executable) {
-            process::Command::new(&executable)
-                .env("TMPDIR", tmp_path)
-                .args(env::args().skip(1))
-                .status()
-                .expect("failed to execute process")
-        } else {
-            process::Command::new("sh")
-                .arg("-c")
-                .env("TMPDIR", tmp_path)
-                .arg(&executable)
-                .args(env::args().skip(1))
-                .status()
-                .expect("failed to execute process")
+        // We need to quote the args here for Command Prompt
+        // Below is the workground given in
+        // https://internals.rust-lang.org/t/std-process-on-windows-is-escaping-raw-literals-which-causes-problems-with-chaining-commands/8163/16
+        let mut args = String::new();
+        args.push_str(quote_arg!(executable).as_str());
+        for arg in env::args().skip(1) {
+            args.push(' ');
+            args.push_str(quote_arg!(arg).as_str());
         }
+        let arg_name = "RANDOMTEMP_COMMANDLINE";
+        process::Command::new("cmd")
+            .arg("/q")
+            .arg("/c")
+            .env("TEMP", tmp_path)
+            .env("TMP", tmp_path)
+            .env(arg_name, args.as_str())
+            .arg(format!("%{}%", arg_name))
+            .status()
+            .expect("failed to execute process")
+    }
+}
+
+#[cfg(not(windows))]
+fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
+    let tmp_dir = TempDir::new_in(&cwd).unwrap_or_else(|_| {
+        error_exit!("Cannot create temporary directory");
+    });
+    let tmp_path = &tmp_dir.path();
+    if is_absolute_path(executable) {
+        process::Command::new(&executable)
+            .env("TMPDIR", tmp_path)
+            .args(env::args().skip(1))
+            .status()
+            .expect("failed to execute process")
+    } else {
+        process::Command::new("sh")
+            .arg("-c")
+            .env("TMPDIR", tmp_path)
+            .arg(&executable)
+            .args(env::args().skip(1))
+            .status()
+            .expect("failed to execute process")
     }
 }
 
@@ -318,10 +324,10 @@ mod tests {
     }
 
     #[cfg(windows)]
-	const ENV_COMMAND: &str = "set";
+    const ENV_COMMAND: &str = "set";
 
     #[cfg(not(windows))]
-	const ENV_COMMAND: &str = "env";
+    const ENV_COMMAND: &str = "env";
 
     #[test]
     fn test_executable_with_env() {
@@ -452,18 +458,18 @@ mod tests {
             assert_eq!(new_env.status.success(), false);
             Some(true)
         });
-	}
-	
-	#[cfg(windows)]
-	#[test]
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn test_executable_with_shell_quoting_windows() {
-		let d = get_current_dir().ok();
+        let d = get_current_dir().ok();
         d.and_then(|p| {
             let new_env = process::Command::new("randomtemp")
-				.env("RANDOMTEMP_EXECUTABLE", "dir")
-				.env_remove("RANDOMTEMP_BASEDIR")
-				.env_remove("RANDOMTEMP_MAXTRIAL")
-				.arg("C:\\Program Files")
+                .env("RANDOMTEMP_EXECUTABLE", "dir")
+                .env_remove("RANDOMTEMP_BASEDIR")
+                .env_remove("RANDOMTEMP_MAXTRIAL")
+                .arg("C:\\Program Files")
                 .current_dir(p)
                 .output()
                 .expect("failed to execute process");
@@ -472,7 +478,7 @@ mod tests {
             let new_error = new_env.stderr;
 
             assert_ne!(new_output.len(), 0);
-			assert_eq!(new_error.len(), 0);
+            assert_eq!(new_error.len(), 0);
             assert_eq!(new_env.status.success(), true);
             Some(true)
         });

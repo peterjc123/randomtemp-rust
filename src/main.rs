@@ -75,11 +75,11 @@ fn find_executable_in_path_by_env(exec: &str) -> Result<PathBuf, String> {
 }
 
 fn get_current_exe_pathbuf() -> Result<PathBuf, String> {
-    env::current_exe().or_else(|_| Err("Cannot get the current working executable".to_string()))
+    env::current_exe().map_err(|_| "Cannot get the current working executable".to_string())
 }
 
 fn get_current_dir_pathbuf() -> Result<PathBuf, String> {
-    env::current_dir().or_else(|_| Err("Cannot get the current working directory".to_string()))
+    env::current_dir().map_err(|_| "Cannot get the current working directory".to_string())
 }
 
 #[allow(dead_code)]
@@ -131,9 +131,9 @@ fn get_pretend_executable() -> String {
         .ok()
         .and_then(|exec| {
             find_executable_in_path_by_env(&exec)
-                .or_else(|e| {
+                .map_err(|e| {
                     if e.is_empty() {
-                        Err(e)
+                        e
                     } else {
                         error_exit!(e);
                     }
@@ -154,9 +154,9 @@ fn get_pretend_executable() -> String {
 
 fn get_base_dir() -> String {
     env::var("RANDOMTEMP_BASEDIR")
-        .and_then(|path| {
+        .map(|path| {
             if dir_exists(&path) {
-                Ok(path)
+                path
             } else {
                 error_exit!("The directory specified in RANDOMTEMP_BASEDIR doesn't exist");
             }
@@ -171,10 +171,10 @@ fn get_max_trial() -> u8 {
     const DEFAULT_MAX_TRIAL: u8 = 3;
 
     env::var("RANDOMTEMP_MAXTRIAL")
-        .and_then(|val| {
-            Ok(val.parse().unwrap_or_else(|_| {
+        .map(|val| {
+            val.parse().unwrap_or_else(|_| {
                 error_exit!("RANDOMTEMP_MAXTRIAL is not valid number in 0..256");
-            }))
+            })
         })
         .unwrap_or(DEFAULT_MAX_TRIAL)
 }

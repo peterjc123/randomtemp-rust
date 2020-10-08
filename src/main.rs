@@ -131,15 +131,19 @@ fn get_pretend_executable() -> String {
     env::var("RANDOMTEMP_EXECUTABLE")
         .ok()
         .and_then(|exec| {
-            find_executable_in_path_by_env(&exec)
-                .map_err(|e| {
-                    if e.is_empty() {
-                        e
-                    } else {
-                        error_exit!(e);
-                    }
-                })
-                .ok()
+            if is_absolute_path(&exec) {
+                Some(PathBuf::from(exec))
+            } else {
+                find_executable_in_path_by_env(&exec)
+                    .map_err(|e| {
+                        if e.is_empty() {
+                            e
+                        } else {
+                            error_exit!(e);
+                        }
+                    })
+                    .ok()
+            }
         })
         .unwrap_or_else(|| {
             find_executable_in_path().unwrap_or_else(|e| {
@@ -483,5 +487,41 @@ mod tests {
             assert_eq!(new_env.status.success(), true);
             Some(true)
         });
+    }
+
+    #[test]
+    fn test_pretend_executable_with_absolute_path() -> Result<(), Box<dyn std::error::Error>> {
+        let executable_name = if cfg!(windows) {
+            "test_randomtemp_absolute.exe"
+        } else {
+            "test_randomtemp_absolute"
+        };
+
+        let tmp_dir_1 = TempDir::new()?;
+        let mut tmp_path_1 = tmp_dir_1.path().to_owned();
+        tmp_path_1.push(executable_name);
+
+        let tmp_dir_2 = TempDir::new()?;
+        let mut tmp_path_2 = tmp_dir_2.path().to_owned();
+        tmp_path_2.push(executable_name);
+
+        {
+            fs::File::create(&tmp_path_1)?;
+            fs::File::create(&tmp_path_2)?;
+        }
+
+        if let Some(path) = env::var_os("PATH") {
+            let mut paths = env::split_paths(&path).collect::<Vec<_>>();
+            paths.push(tmp_dir_1.path().to_path_buf());
+            paths.push(tmp_dir_2.path().to_path_buf());
+            let new_path = env::join_paths(paths)?;
+            env::set_var("PATH", &new_path);
+        }
+
+        let actual_executable = tmp_path_2.to_str().unwrap();
+        env::set_var("RANDOMTEMP_EXECUTABLE", actual_executable);
+        let pred_executable = get_pretend_executable();
+        assert_eq!(actual_executable, pred_executable);
+        return Ok(());
     }
 }

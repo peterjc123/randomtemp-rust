@@ -13,7 +13,7 @@ macro_rules! error_exit {
     }};
 }
 
-#[warn(unused_macros)]
+#[allow(unused_macros)]
 macro_rules! quote_arg {
     ($arg:expr) => {
         if $arg.contains(' ') {

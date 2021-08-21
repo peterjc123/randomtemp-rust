@@ -36,14 +36,14 @@ fn is_absolute_path(path: &str) -> bool {
     Path::new(path).is_absolute()
 }
 
-fn find_executable_in_path_by_name(p: &PathBuf, cp: &PathBuf) -> Option<PathBuf> {
-    let f = get_file_name(Some(p));
+fn find_executable_in_path_by_name(p: &Path, cp: &Path) -> Option<PathBuf> {
+    let f = p.file_name();
     f.and_then(|s| {
         which(s)
             .ok()
             // TODO: We should try to find another one instead of
             // skipping.
-            .and_then(|np| if &np == cp { None } else { Some(np) })
+            .and_then(|np| if np == cp { None } else { Some(np) })
     })
 }
 
@@ -98,11 +98,6 @@ fn get_current_dir() -> Result<String, String> {
         .to_str()
         .ok_or("Cannot convert the current working directory to a UTF-8 string")?;
     Ok(String::from(p))
-}
-
-fn get_file_name(pbopt: Option<&PathBuf>) -> Option<&OsStr> {
-    let pb = pbopt?;
-    pb.file_name()
 }
 
 fn get_file_stem(pbopt: Option<&PathBuf>) -> Option<&OsStr> {

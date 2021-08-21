@@ -491,14 +491,30 @@ mod tests {
         let expect_env = call_env();
         let d = get_current_dir().ok();
         d.and_then(|p| {
-            let new_env = process::Command::new("randomtemp")
-                .env_remove("RANDOMTEMP_EXECUTABLE")
-                .env_remove("RANDOMTEMP_BASEDIR")
-                .env_remove("RANDOMTEMP_MAXTRIAL")
-                .arg(ENV_COMMAND)
-                .current_dir(p)
-                .output()
-                .expect("failed to execute process");
+            // set on windows is a builtin and does not exist on the
+            // path so isn't a valid executable, so call via a shell
+            let new_env = if cfg!(windows) {
+                process::Command::new("randomtemp")
+                    .env_remove("RANDOMTEMP_EXECUTABLE")
+                    .env_remove("RANDOMTEMP_BASEDIR")
+                    .env_remove("RANDOMTEMP_MAXTRIAL")
+                    .arg("cmd")
+                    .arg("/q")
+                    .arg("/c")
+                    .arg(ENV_COMMAND)
+                    .current_dir(p)
+                    .output()
+                    .expect("failed to execute process")
+            } else {
+                process::Command::new("randomtemp")
+                    .env_remove("RANDOMTEMP_EXECUTABLE")
+                    .env_remove("RANDOMTEMP_BASEDIR")
+                    .env_remove("RANDOMTEMP_MAXTRIAL")
+                    .arg(ENV_COMMAND)
+                    .current_dir(p)
+                    .output()
+                    .expect("failed to execute process")
+            };
 
             let new_output = new_env.stdout;
             let new_error = new_env.stderr;

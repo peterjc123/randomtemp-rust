@@ -37,6 +37,11 @@ export RANDOMTEMP_EXECUTABLE=nvcc
 # you may notice that the generated temp directories are used
 ```
 
+As an alternative to `RANDOMTEMP_EXECUTABLE`, you can also can pass the executable as the first argument
+```bash
+./randomtemp.exe nvcc -v -ccbin "/usr/bin/gcc-5" "test.cpp"
+```
+
 ## Environment variables
 - RANDOMTEMP_EXECUTABLE: target executable to be patched (Optional, default: name of the current executable)
 - RANDOMTEMP_BASEDIR: directory to store temporary files (Optional, default: current working directory)

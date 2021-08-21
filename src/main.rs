@@ -127,8 +127,9 @@ fn is_same_file_stem(pbopt1: Option<&PathBuf>, pbopt2: Option<&PathBuf>) -> bool
     false
 }
 
-fn get_pretend_executable() -> String {
-    env::var("RANDOMTEMP_EXECUTABLE")
+fn get_pretend_executable() -> (String, usize) {
+    let mut skip_args: usize = 1;
+    let executable = env::var("RANDOMTEMP_EXECUTABLE")
         .ok()
         .and_then(|exec| {
             if is_absolute_path(&exec) {
@@ -145,6 +146,18 @@ fn get_pretend_executable() -> String {
                     .ok()
             }
         })
+        .or_else(|| {
+            // Try finding the executable from the command line
+            let path = env::args()
+                .nth(1)
+                .and_then(|exe| {
+                    which(exe).ok()
+                });
+            if path.is_some() {
+                skip_args = 2;
+            }
+            path
+        })
         .unwrap_or_else(|| {
             find_executable_in_path().unwrap_or_else(|e| {
                 error_exit!(e);
@@ -154,7 +167,9 @@ fn get_pretend_executable() -> String {
         .map(String::from)
         .unwrap_or_else(|| {
             error_exit!("Cannot convert RANDOMTEMP_EXECUTABLE to a UTF-8 string");
-        })
+        });
+
+     (executable, skip_args)
 }
 
 fn get_base_dir() -> String {
@@ -185,7 +200,7 @@ fn get_max_trial() -> u8 {
 }
 
 #[cfg(windows)]
-fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
+fn try_run_with_new_temp(cwd: &str, executable: &str, skip_args: usize) -> process::ExitStatus {
     let tmp_dir = TempDir::new_in(&cwd).unwrap_or_else(|_| {
         error_exit!("Cannot create temporary directory");
     });
@@ -194,7 +209,7 @@ fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
         process::Command::new(&executable)
             .env("TEMP", tmp_path)
             .env("TMP", tmp_path)
-            .args(env::args().skip(1))
+            .args(env::args().skip(skip_args))
             .status()
             .expect("failed to execute process")
     } else {
@@ -203,7 +218,7 @@ fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
         // https://internals.rust-lang.org/t/std-process-on-windows-is-escaping-raw-literals-which-causes-problems-with-chaining-commands/8163/16
         let mut args = String::new();
         args.push_str(quote_arg!(executable).as_str());
-        for arg in env::args().skip(1) {
+        for arg in env::args().skip(skip_args) {
             args.push(' ');
             args.push_str(quote_arg!(arg).as_str());
         }
@@ -221,7 +236,7 @@ fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
 }
 
 #[cfg(not(windows))]
-fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
+fn try_run_with_new_temp(cwd: &str, executable: &str, skip_args: usize) -> process::ExitStatus {
     let tmp_dir = TempDir::new_in(&cwd).unwrap_or_else(|_| {
         error_exit!("Cannot create temporary directory");
     });
@@ -229,7 +244,7 @@ fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
     if is_absolute_path(executable) {
         process::Command::new(&executable)
             .env("TMPDIR", tmp_path)
-            .args(env::args().skip(1))
+            .args(env::args().skip(skip_args))
             .status()
             .expect("failed to execute process")
     } else {
@@ -237,14 +252,14 @@ fn try_run_with_new_temp(cwd: &str, executable: &str) -> process::ExitStatus {
             .arg("-c")
             .env("TMPDIR", tmp_path)
             .arg(&executable)
-            .args(env::args().skip(1))
+            .args(env::args().skip(skip_args))
             .status()
             .expect("failed to execute process")
     }
 }
 
 fn main() {
-    let executable = get_pretend_executable();
+    let (executable, skip_args) = get_pretend_executable();
     let cwd = get_base_dir();
     let max_trial = get_max_trial();
 
@@ -255,7 +270,7 @@ fn main() {
         if retry_times > 0 {
             println!("Retry attempt: {}", retry_times);
         }
-        let status = try_run_with_new_temp(&cwd, &executable);
+        let status = try_run_with_new_temp(&cwd, &executable, skip_args);
         retry_times += 1;
         last_exit_code = status.code().unwrap_or(1);
         if status.success() || retry_times > max_trial {
@@ -331,26 +346,32 @@ mod tests {
     #[cfg(windows)]
     const ENV_COMMAND: &str = "set";
 
+    #[cfg(windows)]
+    fn call_env() -> process::Output {
+        process::Command::new("cmd")
+            .arg("/q")
+            .arg("/c")
+            .arg(ENV_COMMAND)
+            .output()
+            .expect("failed to execute process")
+    }
+
     #[cfg(not(windows))]
     const ENV_COMMAND: &str = "env";
 
+    #[cfg(not(windows))]
+    fn call_env() -> process::Output {
+        process::Command::new("sh")
+            .arg("-c")
+            .arg(ENV_COMMAND)
+            .args(env::args().skip(1))
+            .output()
+            .expect("failed to execute process")
+    }
+
     #[test]
     fn test_executable_with_env() {
-        let original_env = if cfg!(windows) {
-            process::Command::new("cmd")
-                .arg("/q")
-                .arg("/c")
-                .arg(ENV_COMMAND)
-                .output()
-                .expect("failed to execute process")
-        } else {
-            process::Command::new("sh")
-                .arg("-c")
-                .arg(ENV_COMMAND)
-                .args(env::args().skip(1))
-                .output()
-                .expect("failed to execute process")
-        };
+        let original_env = call_env();
         let d = get_current_dir().ok();
         d.and_then(|p| {
             let new_env = process::Command::new("randomtemp")
@@ -465,6 +486,37 @@ mod tests {
         });
     }
 
+    #[test]
+    fn test_executable_on_command_line() {
+        let expect_env = call_env();
+        let d = get_current_dir().ok();
+        d.and_then(|p| {
+            let new_env = process::Command::new("randomtemp")
+                .env_remove("RANDOMTEMP_EXECUTABLE")
+                .env_remove("RANDOMTEMP_BASEDIR")
+                .env_remove("RANDOMTEMP_MAXTRIAL")
+                .arg(ENV_COMMAND)
+                .current_dir(p)
+                .output()
+                .expect("failed to execute process");
+
+            let new_output = new_env.stdout;
+            let new_error = new_env.stderr;
+
+            let expect_output = expect_env.stdout;
+            let expect_error = expect_env.stderr;
+
+            assert_ne!(expect_output, new_output);
+            assert_ne!(expect_output.len(), 0);
+            assert_ne!(new_output.len(), 0);
+            assert_eq!(expect_error.len(), 0);
+            assert_eq!(new_error.len(), 0);
+            assert_eq!(expect_env.status.success(), true);
+            assert_eq!(new_env.status.success(), true);
+            Some(true)
+        });
+    }
+
     #[cfg(windows)]
     #[test]
     fn test_executable_with_shell_quoting_windows() {
@@ -520,7 +572,7 @@ mod tests {
 
         let actual_executable = tmp_path_2.to_str().unwrap();
         env::set_var("RANDOMTEMP_EXECUTABLE", actual_executable);
-        let pred_executable = get_pretend_executable();
+        let (pred_executable, _) = get_pretend_executable();
         assert_eq!(actual_executable, pred_executable);
         return Ok(());
     }
